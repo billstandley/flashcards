@@ -1,0 +1,1367 @@
+<html xmlns="http://www.w3.org/1999/xhtml">
+	<head>
+		<meta charset="utf-8"/>
+	</head>
+	<body>
+		<div>
+			<canvas id="myCanvas" width="1200" height="300" style="border:1px solid #d3d3d3;">
+				HTML Canvas Unsupported
+			</canvas>
+		</div>
+		<div>
+			<b>Nouns: </b>
+			<select id="menuDeclension" onchange="cardView.declensionSelected()">
+				<option value="0">1st Declension Feminine</option>
+				<option value="1">2nd Declension Masculine</option>
+				<option value="2">2nd Declension Neuter</option>
+				<option value="3">Random Declension</option>
+			</select>
+			<b>&nbsp;</b>
+			<button id="buttonFirst" onclick="cardView.chooseFirstWord()">PRÍMUS</button>
+			<button id="buttonPrevious" onclick="cardView.choosePreviousWord()">ÁNTE</button>
+			<button id="buttonNext" onclick="cardView.chooseNextWord()">POST</button>
+			<button id="buttonLast" onclick="cardView.chooseLastWord()">ÚLTIMA</button>
+		</div>
+		<div>
+			<b>Selection:&nbsp;</b>
+			<select id="menuWordMode" onchange="cardView.wordModeSelected()">
+				<option value="0">Alphabetic</option>
+				<option value="1">Random Word</option>
+			</select>
+			<b>&nbsp;</b>
+			<select id="menuNumberMode" onchange="cardView.numberModeSelected()">
+				<option value="0">Singular</option>
+				<option value="1">Plural</option>
+				<option value="2">Random Number</option>
+			</select>
+			<b>&nbsp;</b>
+			<select id="menuCaseMode" onchange="cardView.caseModeSelected()">
+				<option value="0">Nominative</option>
+				<option value="1">Genitive</option>
+				<option value="2">Dative</option>
+				<option value="3">Accusative</option>
+				<option value="4">Ablative</option>
+				<option value="5">Random Case</option>
+			</select>
+		</div>
+		<div>
+			<input type="checkbox" id="checkboxShowAllCases" onclick="cardView.toggleShowAllCases()">Show All Cases</input>
+		</div>
+		<script>
+			var	RANDOM	= null;
+
+			class Utils
+			{
+
+				static getRandomInt (inMin, inMax)
+				{
+					var min = Math.ceil(inMin);
+					var max = Math.floor(inMax);
+					return Math.floor (Math.random() * (max - min)) + min;
+				}
+
+				static getElementFromID (inElementID)
+				{
+					if (document)
+						if (document.getElementById)
+							if (document.getElementById (inElementID))
+								return document.getElementById (inElementID);
+					return null;
+				}
+
+				static setButtonText (inButtonID, inNewText)
+				{
+					var button = Utils.getElementFromID (inButtonID);
+					if (button)
+					{
+						if (button.childNodes[0])
+							button.childNodes[0].nodeValue = inNewText;
+						else if (button.value)
+							button.value = inNewText;
+						else //if (button.innerHTML)
+							button.innerHTML = inNewText;
+					}
+				}
+
+				static showElement (inElement)
+				{
+					if (inElement)
+						//inElement.style.visibility = 'visible';
+						inElement.style.display = '';
+						//inElement.disabled = false;
+				}
+
+				static hideElement (inElement)
+				{
+					if (inElement)
+						//inElement.style.visibility = 'visible';
+						inElement.style.display = 'none';
+						//inElement.disabled = true;
+				}
+
+			}	//	Utils
+
+			class Number
+			{
+				static Singular()	{return 0;}
+				static Plural()		{return 1;}
+				static toString(inNumber)
+				{
+					if (inNumber > 0)	return "Plur";
+					else				return "Sing";
+				}
+				static getMeaning(inNumber)
+				{
+					if (inNumber > 0)	return "Plural";
+					else				return "Singular";
+				}
+			}
+
+			class Case
+			{
+				static Nominative()	{return 0;}
+				static Genitive()	{return 1;}
+				static Dative()		{return 2;}
+				static Accusative()	{return 3;}
+				static Ablative()	{return 4;}
+				static toString(inCase, inDetailed)
+				{
+					const _names = ["Nom", "Gen", "Dat", "Acc", "Abl"];
+					const _bigNames = ["Nominative", "Genitive", "Dative", "Accusative", "Ablative"];
+					if (inDetailed != null && inDetailed)
+						return _bigNames[inCase];
+					return _names[inCase];
+				}
+				static getMeaning(inCase)
+				{
+					const _meanings = [	"Nominative (subject)",
+										"Genitive (possessive, of…)",
+										"Dative (indirect object -- to… for…)",
+										"Accusative (direct object)",
+										"Ablative (after a preposition -- by… with… from…)"];
+					return _meanings[inCase];
+				}
+			}
+
+			class Gender
+			{
+				static Neuter()		{return 0;}
+				static Masculine()	{return 1;}
+				static Feminine()	{return 2;}
+				static toString(inGender)
+				{
+					const _names = ["Neut", "Masc", "Fem"];
+					return _names[inGender];
+				}
+				static getMeaning(inGender)
+				{
+					const _meanings = [	"Neuter",
+										"Masculine",
+										"Feminine"];
+					return _meanings[inGender];
+				}
+			}
+
+			class Declension
+			{
+				static First()		{return 1;}
+				static Second()		{return 2;}
+				static Third()		{return 3;}
+				static Fourth()		{return 4;}
+				static toString (inDecl)
+				{
+					const _names = ["???",	"1st",	"2nd",	"3rd",	"4th"];
+					return _names[inDecl];
+				}
+			}
+
+
+			//////////////////////////////////////////////////////////////////////////////////////////////
+			//	I'm a Noun model.
+			//////////////////////////////////////////////////////////////////////////////////////////////
+			class Nouns1stDeclension
+			{
+				constructor()
+				{
+					//	Dictionary		Latin Root			English Meaning
+					this._words =	[	["absenti",			"absence; non-appearance in court; lack"],
+										["al",				"wing"],
+										["allegori",		"allegory"],
+										["amenti",			"madness"],
+										["amiciti",			"friendship"],
+										["ampull",			"flask/bottle/jar/vessel"],
+										["ancor",			"anchor"],
+										["ancill",			"maid-servant, female slave"],
+										["angusti",			"strait"],
+										["anim",			"soul"],
+										["ans",				"handle/loop/hook"],
+										["aqu",				"water"],
+										["aquil",			"eagle"],
+										["ar",				"altar"],
+										["aren",			"sand"],
+										["astrologi",		"astrology"],
+										["audaci",			"boldness"],
+										["avariti",			"greed"],
+										["benevoleni",		"benevolence, kindness, goodwill; favor; endearments"],
+										["besti",			"beast/wild animal"],
+										["bibliothec",		"library"],
+										["caps",			"box/repository"],
+										["capsul",			"box"],
+										["cas",				"house"],
+										["caten",			"chain"],
+										["caterv",			"troop"],
+										["caus",			"cause/reason/motive/opportunity"],
+										["cen",				"dinner"],
+										["cicad",			"tree-cricket; Athenian hair ornament in shape of cicada; summer season"],
+										["clementi",		"mercy"],
+										["columb",			"dove"],
+										["column",			"column/pillar/post"],
+										["com",				"hair"],
+										["concordi",		"harmony"],
+										["conscienti",		"conscience"],
+										["consonanti",		"consonant"],
+										["constanti",		"steadfastness"],
+										["continent",		"restraint/temperance/moderation"],
+										["controversi",		"dispute"],
+										["contumeli",		"insult"],
+										["copi",			"abundance"],
+										["coron",			"garland"],
+										["cosmographi",		"cosmography/map-making"],
+										["creatur",			"creature"],
+										["crumen",			"money bag/purse"],
+										["cucurbit",		"flask"],
+										["culin",			"kitchen"],
+										["culp",			"fault"],
+										["cultur",			"cultivation"],
+										["cur",				"care"],
+										["custodi",			"guard"],
+										["de",				"goddess"],
+										["dementi",			"madness"],
+										["dextr",			"right hand"],
+										["differenti",		"difference/diversity"],
+										["diligenti",		"carefulness"],
+										["disciplin",		"training"],
+										["discordi",		"strife"],
+										["div",				"goddess"],
+										["doctrin",			"teaching"],
+										["ecclesi",			"gathering/church"],
+										["epistul",			"letter"],
+										["essenti",			"essence"],
+										["excellenti",		"excellence"],
+										["fabul",			"story"],
+										["fam",				"fame/reputation"],
+										["famili",			"household"],
+										["favill",			"cinders/hot ashes/glowing embers"],
+										["femin",			"woman"],
+										["fer",				"wild animal"],
+										["feri",			"holidays"],
+										["feroci",			"courage"],
+										["fiduci",			"trust"],
+										["figur",			"figure"],
+										["fili",			"daughter"],
+										["fistul",			"pipe/tube"],
+										["flamm",			"flame"],
+										["form",			"form"],
+										["formic",			"ant"],
+										["fortun",			"fortune"],
+										["foss",			"ditch"],
+										["frequenti",		"crowd"],
+										["fug",				"flight"],
+										["geographi",		"geography"],
+										["geometri",		"geometry"],
+										["glori",			"fame/glory"],
+										["grati",			"good-will"],
+										["gutt",			"drop/spot"],
+										["guttul",			"small drop/speck"],
+										["haren",			"sand"],
+										["harmoni",			"harmony/concord/consonance/agreement"],
+										["hast",			"spear"],
+										["herb",			"herb"],
+										["histori",			"history"],
+										["hor",				"hour"],
+										["iactur",			"expense"],
+										["ianu",			"door"],
+										["ignomini",		"dishonor"],
+										["ignoranti",		"ignorance"],
+										["impens",			"expenditure/cost/expense/charge"],
+										["imperiti",		"inexperience"],
+										["imprudenti",		"lack of foresight"],
+										["indulgenti",		"indulgence"],
+										["induti",			"truce"],
+										["inerti",			"sluggishness"],
+										["inimiciti",		"enmity"],
+										["iniuri",			"outrage"],
+										["inopi",			"lack"],
+										["insani",			"frenzy"],
+										["insul",			"island"],
+										["intelligenti",	"discernment/understanding/intelligence"],
+										["invidi",			"envy"],
+										["ir",				"anger"],
+										["iustiti",			"justice"],
+										["lacrim",			"tear"],
+										["lætiti",			"joy"],
+										["libr",			"balance/scales"],
+										["licenti",			"licence"],
+										["lingu",			"tongue"],
+										["litter",			"letter"],
+										["lun",				"moon"],
+										["lup",				"wolf"],
+										["luxuri",			"profusion"],
+										["machin",			"engine"],
+										["macul",			"spot/mark/stain/blemish/hole/fault/disgrace"],
+										["magi",			"magic"],
+										["margarit",		"pearl"],
+										["mass",			"lump/mass"],
+										["materi",			"matter"],
+										["medicin",			"medicine/cure/remedy"],
+										["melodi",			"melody/tune"],
+										["memori",			"memory"],
+										["mens",			"table"],
+										["mensur",			"measure"],
+										["met",				"limit"],
+										["metaphysic",		"metaphysic"],
+										["militi",			"warfare"],
+										["ministr",			"assistant/maid-servant/accessory"],
+										["miseri",			"misery/trouble/distress"],
+										["misericordi",		"pity/compassion/sympathy/mercy"],
+										["molesti",			"trouble"],
+										["molliti",			"softness"],
+										["mor",				"delay"],
+										["musc",			"fly"],
+										["music",			"music"],
+										["nātūr",			"nature"],
+										["nebul",			"mist/vapor"],
+										["neglegenti",		"carelessness"],
+										["not",				"sign"],
+										["nupt",			"bride"],
+										["nupti",			"wedding"],
+										["off",				"bit/morsel"],
+										["oper",			"labor/work"],
+										["or",				"prayer/ also edge"],
+										["palm",			"palm"],
+										["panace",			"all-heal/panacea/universal medicine"],
+										["parabol",			"parable/story"],
+										["patienti",		"patience"],
+										["patri",			"native country"],
+										["pecuni",			"money"],
+										["perfidi",			"treachery"],
+										["periti",			"skill"],
+										["petr",			"rock"],
+										["philosophi",		"philosophy"],
+										["phiol",			"phial/flask"],
+										["physic",			"natural philosophy/science/medicine"],
+										["pictur",			"picture/painting"],
+										["plag",			"blow/stroke/wound/misfortune/disaster"],
+										["planet",			"planet"],
+										["pœn",				"penalty"],
+										["port",			"gate"],
+										["potenti",			"power"],
+										["præd",			"prey"],
+										["præsenti",		"presence"],
+										["præstanti",		"pre-eminence/superiority/excellence"],
+										["procell",			"storm"],
+										["pror",			"prow"],
+										["provinci",		"province"],
+										["prudenti",		"discretion"],
+										["puell",			"girl"],
+										["pueriti",			"childhood"],
+										["pugn",			"fight"],
+										["regin",			"queen"],
+										["regul",			"rule/standard"],
+										["rip",				"river bank"],
+										["ros",				"dew"],
+										["rot",				"wheel"],
+										["ruin",			"catastrophe"],
+										["sæviti",			"cruelty"],
+										["sagitt",			"arrow"],
+										["salamandr",		"salamander"],
+										["sapienti",		"wisdom"],
+										["scal",			"ladder/staircase"],
+										["scienti",			"science/knowledge/skill"],
+										["sententi",		"opinion/judgment/purpose"],
+										["sic",				"dagger"],
+										["silv",			"forest"],
+										["sinistr",			"left hand"],
+										["spelunc",			"cave"],
+										["sperm",			"seed/sperm"],
+										["sphær",			"ball/globe/sphere"],
+										["spin",			"thorn/prickle/spine/difficulties/intricacies"],
+										["statu",			"statue"],
+										["statur",			"stature"],
+										["stell",			"star"],
+										["stultiti",		"folly"],
+										["substanti",		"resources/wealth"],
+										["summ",			"sum total"],
+										["superbi",			"pride"],
+										["tabern",			"hut,stall,hostel"],
+										["tabul",			"board"],
+										["temperanti",		"moderation/temperance/self-control"],
+										["tenebr",			"darkness"],
+										["terr",			"earth"],
+										["test",			"test"],
+										["theologi",		"theology"],
+										["tinctur",			"tincture"],
+										["tristiti",		"gloom"],
+										["tub",				"trumpet"],
+										["turb",			"riot"],
+										["umbr",			"shadow"],
+										["unci",			"a twelfth part/ounce"],
+										["und",				"wave"],
+										["uv",				"grape/berry"],
+										["vacc",			"cow"],
+										["veni",			"pardon"],
+										["vesic",			"bladder/vessel"],
+										["vesper",			"evening"],
+										["vi",				"way"],
+										["victori",			"victory"],
+										["vigili",			"wakefulness"],
+										["vill",			"country house"],
+										["violenti",		"violence"],
+										["vit",				"life"					]];
+					this._numWords	= this._words.length;
+					this._endings = [	["a",	"æ",	"æ",	"am",	"a"		],	//	Singular
+										["æ",	"árum",	"is",	"as",	"is"	]];	//	Plural
+				}	//	constructor
+
+				getWordCount()
+				{
+					return this._numWords;
+				}
+
+				getWordRoot (inWordIndex)
+				{
+					if (inWordIndex >= 0  &&  inWordIndex < this._numWords)
+						return this._words[inWordIndex][0];
+					return "";
+				}
+
+				getEnding (inNumber, inCase)
+				{
+					if (inNumber >= 0  &&  inNumber < 2)
+					{
+						var	endingsPerCase	= this._endings[inNumber];
+						if (inCase >= 0  &&  inCase < 6)
+							return endingsPerCase[inCase];
+					}
+					return "";
+				}
+
+				getWordDefinition (inWordIndex)
+				{
+					if (inWordIndex >= 0  &&  inWordIndex < this._numWords)
+						return this._words[inWordIndex][1];
+					return "";
+				}
+
+				getWordRendering (inWordIndex, inNumber, inCase)
+				{
+					if (inWordIndex >= 0  &&  inWordIndex < this._numWords)
+						if (inNumber >= 0  &&  inNumber < 2)
+							if (inCase >= 0  &&  inCase < 6)
+								return this.getWordRoot(inWordIndex) + this.getEnding(inNumber, inCase);
+					return "";
+				}
+
+				getGender()				{	return Gender.Feminine();	}
+				getDeclension()			{	return Declension.First();	}
+				getDescription()		{	return "1st Declension Feminine";	}
+
+			}	//	Nouns1stDeclension
+
+			class Nouns2ndDeclensionMasc
+			{
+				constructor()
+				{
+					//	Dictionary		Latin Root			English Meaning
+					this._words =	[	["amic",			"friend"],
+										["angel",			"angel"],
+										["anim",			"mind/soul"],
+										["ann",				"year"],
+										["asin",			"ass"],
+										["astrolog",		"astrologer"],
+										["av",				"grandfather"],
+										["barbar",			"foreign"],
+										["camp",			"field"],
+										["capill",			"hair"],
+										["centesim",		"hundredth"],
+										["cib",				"food"],
+										["circul",			"circle/orbit/ring/chain"],
+										["cirr",			"ringlet/curl of hair"],
+										["cognat",			"blood-relation"],
+										["commentari",		"note/memorandum/commentary/record"],
+										["coqu",			"cook"],
+										["coniurat",		"conspirators"],
+										["consci",			"accomplice/confidant"],
+										["corv",			"crow/raven"],
+										["cub",				"cube/mass/quantity"],
+										["de",				"god"],
+										["decim",			"tenth"],
+										["dialog",			"discussion/dialogue"],
+										["div",				"god"],
+										["dol",				"guile"],
+										["domin",			"master/lord"],
+										["ducentensim",		"two hundredth"],
+										["duodecentensim",	"ninety eighth"],
+										["duodecim",		"twelfth"],
+										["duodetricensim",	"twenty eighth"],
+										["duodevicensim",	"eighteenth"],
+										["epilog",			"peroration/epilogue"],
+										["equ",				"horse"],
+										["fast",			"calendar/records"],
+										["fili",			"son"],
+										["fluvi",			"river"],
+										["foc",				"hearth"],
+										["fugitiv",			"deserter"],
+										["fum",				"smoke"],
+										["fund",			"bottom or estate"],
+										["gener",			"son-in-law"],
+										["geni",			"tutelar diety/genius"],
+										["gladi",			"sword"],
+										["hort",			"garden"],
+										["humer",			"upper arm/shoulder"],
+										["infer",			"the dead"],
+										["inimic",			"enemy"],
+										["lect",			"bed/couch"],
+										["legat",			"commissioner/deputy"],
+										["libell",			"small book/notebook"],
+										["libert",			"freedman"],
+										["loc",				"place position"],
+										["luc",				"grove"],
+										["lud",				"game/school/sport"],
+										["lup",				"wolf"],
+										["mag",				"magician"],
+										["mal",				"mast"],
+										["medic",			"physician/doctor"],
+										["mercuri",			"Mercury"],
+										["millensim",		"thousandth"],
+										["mod",				"measure/limit/manner/sort"],
+										["morb",			"illness"],
+										["mund",			"universe/world/heavens"],
+										["mur",				"wall"],
+										["nat",				"son"],
+										["nerv",			"cord/string"],
+										["non",				"ninth"],
+										["numer",			"number"],
+										["numm",			"coin"],
+										["nunti",			"messenger"],
+										["octav",			"eighth"],
+										["ocul",			"eye"],
+										["oppidan",			"townsfolk"],
+										["pagan",			"peasant, villager"],
+										["pag",				"district"],
+										["pann",			"piece of cloth/garment/rag"],
+										["patron",			"defender/patron"],
+										["philosoph",		"philosopher"],
+										["planet",			"planet"],
+										["pol",				"pole/end of an axis/heavens/celestial vault"],
+										["pont",			"sea"],
+										["popul",			"nation/people"],
+										["porc",			"pig"],
+										["præfect",			"superintendent"],
+										["prim",			"first"],
+										["prodrom",			"forerunner"],
+										["propinqu",		"near relative"],
+										["puell",			"little boy"],
+										["quint",			"fifth"],
+										["radi",			"rod/staff"],
+										["ram",				"bough"],
+										["rem",				"oar"],
+										["riv",				"brook"],
+										["sagittari",		"archer"],
+										["sacc",			"beg/purse"],
+										["saturn",			"Saturn"],
+										["scopul",			"cliff"],
+										["scyph",			"cup"],
+										["secund",			"second"],
+										["septim",			"seventh"],
+										["serv",			"slave"],
+										["sext",			"sixth"],
+										["sicari",			"assassin"],
+										["socer",			"father-in-law"],
+										["soci",			"ally/associate/partner"],
+										["somn",			"sleep?"],
+										["son",				"sound"],
+										["super",			"the gods above"],
+										["symbol",			"symbol/token"],
+										["tartar",			"tartar"],
+										["taur",			"bull"],
+										["termin",			"boundary/end"],
+										["ternari",			"ternary"],
+										["terti",			"third"],
+										["thesaur",			"hoard/treasure/collection/treasury"],
+										["tom",				"volume"],
+										["tribul",			"thorn bush/thistle"],
+										["tribun",			"tribune"],
+										["triumph",			"triumph"],
+										["trunc",			"trunk"],
+										["tumul",			"mound"],
+										["tyrann",			"ruler"],
+										["umer",			"shoulder"],
+										["undecim",			"eleventh"],
+										["vent",			"wind"],
+										["vesper",			"evening/west"],
+										["vic",				"street/village"],
+										["vir",				"man/hero"					]];
+					this._numWords	= this._words.length;
+					this._endings = [	["us",	"i",	"o",	"um",	"o"		],	//	Singular
+										["i",	"orum",	"is",	"os",	"is"	]];	//	Plural
+				}	//	constructor
+
+				getWordCount()
+				{
+					return this._numWords;
+				}
+
+				getWordRoot (inWordIndex)
+				{
+					if (inWordIndex >= 0  &&  inWordIndex < this._numWords)
+						return this._words[inWordIndex][0];
+					return "";
+				}
+
+				getEnding (inNumber, inCase)
+				{
+					if (inNumber >= 0  &&  inNumber < 2)
+					{
+						var	endingsPerCase	= this._endings[inNumber];
+						if (inCase >= 0  &&  inCase < 6)
+							return endingsPerCase[inCase];
+					}
+					return "";
+				}
+
+				getWordDefinition (inWordIndex)
+				{
+					if (inWordIndex >= 0  &&  inWordIndex < this._numWords)
+						return this._words[inWordIndex][1];
+					return "";
+				}
+
+				getWordRendering (inWordIndex, inNumber, inCase)
+				{
+					if (inWordIndex >= 0  &&  inWordIndex < this._numWords)
+						if (inNumber >= 0  &&  inNumber < 2)
+							if (inCase >= 0  &&  inCase < 6)
+								return this.getWordRoot(inWordIndex) + this.getEnding(inNumber, inCase);
+					return "";
+				}
+
+				getGender()				{	return Gender.Masculine();	}
+				getDeclension()			{	return Declension.Second();	}
+				getDescription()		{	return "2nd Declension Masculine";	}
+
+			}	//	Nouns2ndDeclensionMasc
+
+			class Nouns2ndDeclensionNeut
+			{
+				constructor()
+				{
+					//	Dictionary		Latin Root			English Meaning
+					this._words =	[	["acet",		"vinegar"],
+										["ædifici",		"building"],
+										["æv",			"eternity/age/generation/lifetime"],
+										["aliquantul",	"trifle/a little/somewhat"],
+										["alt",			"the deep"],
+										["argent",		"silver"],
+										["argent",		"argument/evidence/ground/proof/sign"],
+										["arithmetic",	"arithmetic"],
+										["arsenic",		"arsenic"],
+										["artifici",	"skill/art/knowledge/trade"],
+										["arv",			"field/territory"],
+										["atri",		"hall"],
+										["aur",			"gold"],
+										["auxili",		"help"],
+										["balne",		"bath"],
+										["balsam",		"balsam/fragrant gum"],
+										["bell",		"war"],
+										["benefici",	"act of kindness/service"],
+										["bracchi",		"arm"],
+										["breviari",	"summary, abridgment"],
+										["cæl",			"sky/heaven/weather"],
+										["castell",		"fortress"],
+										["castr",		"camp"],
+										["coagul",		"agent of coagulation/"],
+										["coll",		"neck"],
+										["commentari",	"note/memorandum/commentary/record"],
+										["commod",		"advantage/profit"],
+										["compendi",	"gain/profit"],
+										["concili",		"meeting/assembly"],
+										["conloqui",	"conference"],
+										["consili",		"plan/design/judgement"],
+										["consult",		"decree"],
+										["curricul",	"race/course/lap/career"],
+										["damn",		"loss/damage"],
+										["decret",		"decree"],
+										["delubr",		"temple/shrine/sanctuary/place of cleansing"],
+										["desideri",	"longing/regret"],
+										["detriment",	"damage/loss"],
+										["dict",		"saving/word"],
+										["domicili",	"abode/dwelling"],
+										["don",			"gift"],
+										["edict",		"proclamation/manifesto"],
+										["element",		"element/first principle/simple substance"],
+										["emolent",		"gain/profit/advantage/benefit"],
+										["epitaphi",	"epitaph"],
+										["exempl",		"copy/example"],
+										["exit",		"destruction/ruin"],
+										["experiment",	"proof/test/trial/experiment"],
+										["exsili",		"banishment/exile"],
+										["fact",		"deed/act"],
+										["fan",			"shrine"],
+										["fat",			"fate/destiny/prophecy"],
+										["ferment",		"ferment/yeast"],
+										["ferr",		"iron"],
+										["firmament",	"support/strengthening/firmament"],
+										["flagiti",		"offense/disgrace"],
+										["for",			"market-place"],
+										["fossili",		"fossil"],
+										["frent",		"corn/grain"],
+										["fundament",	"foundation"],
+										["furt",		"theft"],
+										["gaudi",		"joy/pleasure"],
+										["gran",		"seed/grain"],
+										["hibern",		"winter quarters"],
+										["hil",			"the least bit"],
+										["horologi",	"clock/sun-dial"],
+										["hospiti",		"hospitality"],
+										["impediment",	"encumbrance/hindrance"],
+										["imperat",		"command"],
+										["imperi",		"command/authority/empire"],
+										["incendi",		"fire/conflagration"],
+										["incept",		"beginning/attempt"],
+										["incommod",	"trouble/setback"],
+										["indici",		"information/evidence/proof"],
+										["ingeni",		"innate quality/temperament/genius"],
+										["initi",		"beginning"],
+										["institut",	"custom/practice/institution"],
+										["instrent",	"tool/instrument/equipment"],
+										["intervall",	"interval"],
+										["iudici",		"trial/verdict/judgement"],
+										["iug",			"yoke/pair/ mountain ridge"],
+										["ient",		"beast of burden"],
+										["iuss",		"orders"],
+										["latrocini",	"brigandage"],
+										["let",			"death"],
+										["lign",		"firewood"],
+										["logic",		"logic (pl. only)"],
+										["lustr",		"purifactory sacrifice"],
+										["magisteri",	"presidency/directorship/tutorship"],
+										["mal",			"calamity/evil/hurt/apple"],
+										["malefici",	"crime/evil deed"],
+										["mandat",		"commission/injunction"],
+										["membr",		"limb"],
+										["mendaci",		"falsehood/lie"],
+										["merit",		"benefit/kindness/service"],
+										["metall",		"metal/mine"],
+										["ministeri",	"service/office/duty"],
+										["miracul",		"marvel/wonder"],
+										["moment",		"movement/change/short space/moment/importance/influence"],
+										["monstr",		"omen/portent/monster"],
+										["monent",		"memorial"],
+										["muniment",	"fortification/shelter"],
+										["mysteri",		"secret/mystery"],
+										["navigi",		"boat/vessel"],
+										["negoti",		"business/employment"],
+										["nihil",		"nothing"],
+										["nocent",		"harm/injury/bane/hurt"],
+										["nutriment",	"nourishment/support"],
+										["obsequi",		"compliance; consideration/deference/solicitude; services"],
+										["odi",			"hatred"],
+										["offici",		"service/kindness/favour/courtesy/obligation/duty"],
+										["ole",			"oil"],
+										["oppid",		"town"],
+										["opuscul",		"little work"],
+										["oracul",		"oracle"],
+										["ornament",	"equipment/decoration/furniture"],
+										["oti",			"leisure/rest/ease"],
+										["ov",			"egg"],
+										["pabul",		"fodder"],
+										["pact",		"agreement/bargain/contract"],
+										["peccat",		"sin"],
+										["perfugi",		"place of refuge"],
+										["pericul",		"experiment/danger/risk"],
+										["pom",			"fruit/tree or orchard fruit/pomegranate"],
+										["præcept",		"injunction/maxim"],
+										["præmi",		"reward"],
+										["præsidi",		"guard/protection/escort"],
+										["preti",		"price/value/worth"],
+										["primordi",	"beginning"],
+										["principi",	"beginning/origin/principles"],
+										["prœl",		"battle"],
+										["profund",		"depth/abyss"],
+										["promiss",		"promise"],
+										["proposit",	"design/intention/theme"],
+										["propugnacul",	"bulwark/tower/defence/protection/fortress"],
+										["punct",		"point"],
+										["regn",		"sovereignty/kingdom/realm"],
+										["remedi",		"cure/remedy"],
+										["repagul",		"doors/bolts/bars"],
+										["respons",		"answer/reply"],
+										["rostr",		"beak/speakers platform"],
+										["sacr",		"sacred site or vessels/rites"],
+										["sacrament",	"sacrament/oath of allegiance/engagement"],
+										["sæcul",		"generation/age/century"],
+										["sax",			"rock"],
+										["script",		"writings"],
+										["scut",		"shield"],
+										["sepulcr",		"tomb"],
+										["serviti",		"servitude/slavery"],
+										["sigill",		"seal/sigils"],
+										["sign",		"mark/sign/figure"],
+										["silenti",		"silence/stillness/being still"],
+										["simulacr",	"image/phantom"],
+										["solati",		"comfort/solace"],
+										["soli",		"seat/throne/tube/rule"],
+										["somn",		"dream"],
+										["spati",		"space/distance/interval/time"],
+										["spectacul",	"sight/spectacle"],
+										["specul",		"mirror/reflector"],
+										["spoli",		"spoil"],
+										["stipendi",	"tax/pay"],
+										["studi",		"eagerness/zeal/devotion/study"],
+										["subsidi",		"aid/reinforcements/assistance"],
+										["suffragi",	"vote/approval"],
+										["supplement",	"reinforcements"],
+										["supplici",	"punishment/entreaty/suffering"],
+										["tablin",		"study (room)"],
+										["tect",		"roof/shelter"],
+										["tel",			"missile/weapon"],
+										["templ",		"temple/consecrated ground"],
+										["terg",		"back/rear/hide/skin"],
+										["testament",	"will"],
+										["testimoni",	"evidence"],
+										["torment",		"torture/anguish"],
+										["tribut",		"tax/tribute"],
+										["triclini",	"couch"],
+										["tritic",		"wheat"],
+										["vad",			"ford"],
+										["vall",		"rampart"],
+										["venen",		"poison/charm/drug/potion"],
+										["ver",			"truth/fact/reality"],
+										["verb",		"word"],
+										["vestigi",		"footprint/trace/instant"],
+										["vestiment",	"clothes"],
+										["vin",			"wine"],
+										["vincul",		"bond/fetter/prison"],
+										["viti",		"defect/fault/crime/offence"],
+										["vitr",		"glass"],
+										["vot",			"vow/prayer"],
+										["vulg",		"common people/mob/crowd."					]];
+					this._numWords	= this._words.length;
+					this._endings = [	["um",	"i",	"o",	"um",	"o"		],	//	Singular
+										["a",	"orum",	"is",	"a",	"is"	]];	//	Plural
+				}	//	constructor
+
+				getWordCount()
+				{
+					return this._numWords;
+				}
+
+				getWordRoot (inWordIndex)
+				{
+					if (inWordIndex >= 0  &&  inWordIndex < this._numWords)
+						return this._words[inWordIndex][0];
+					return "";
+				}
+
+				getEnding (inNumber, inCase)
+				{
+					if (inNumber >= 0  &&  inNumber < 2)
+					{
+						var	endingsPerCase	= this._endings[inNumber];
+						if (inCase >= 0  &&  inCase < 6)
+							return endingsPerCase[inCase];
+					}
+					return "";
+				}
+
+				getWordDefinition (inWordIndex)
+				{
+					if (inWordIndex >= 0  &&  inWordIndex < this._numWords)
+						return this._words[inWordIndex][1];
+					return "";
+				}
+
+				getWordRendering (inWordIndex, inNumber, inCase)
+				{
+					if (inWordIndex >= 0  &&  inWordIndex < this._numWords)
+						if (inNumber >= 0  &&  inNumber < 2)
+							if (inCase >= 0  &&  inCase < 6)
+								return this.getWordRoot(inWordIndex) + this.getEnding(inNumber, inCase);
+					return "";
+				}
+
+				getGender()				{	return Gender.Neuter();	}
+				getDeclension()			{	return Declension.Second();	}
+				getDescription()		{	return "2nd Declension Neuter";	}
+
+			}	//	Nouns2ndDeclensionNeut
+
+
+			//////////////////////////////////////////////////////////////////////////////////////////////
+			//	I'm a viewer/controller that views/controls my word display.
+			//////////////////////////////////////////////////////////////////////////////////////////////
+			class FlashCardView
+			{
+				constructor()
+				{
+					this._nouns				= new Array;
+					this._nouns[0]			= new Nouns1stDeclension;
+					this._nouns[1]			= new Nouns2ndDeclensionMasc;
+					this._nouns[2]			= new Nouns2ndDeclensionNeut;
+					this._canvas			= null;
+					this._context			= null;
+					this._showAllCases		= false;
+					this._leftMargin		= 200;
+					this._topMargin			= 70;
+					this._wordIndex			= 0;
+					this._chooseDeclension	= 0;
+					this._chooseWord		= RANDOM;		//	If null, choose randomly
+					this._chooseNumber		= RANDOM;		//	If null, choose randomly
+					this._chooseCase		= RANDOM;		//	If null, choose randomly
+					this._currentDeclension	= 0;		//	If null, choose randomly
+					this._currentNumber		= Number.Singular();
+					this._currentCase		= Case.Nominative();
+					this._currentGender		= Gender.Feminine();	//	These are all feminine
+
+					this._canvas = document.getElementById("myCanvas");
+					if (this._canvas != null)
+						this._context = this._canvas.getContext("2d");
+
+					this._declensionMenu		= Utils.getElementFromID ('menuDeclension');
+					this._buttonFirst			= Utils.getElementFromID ('buttonFirst');
+					this._buttonPrevious		= Utils.getElementFromID ('buttonPrevious');
+					this._buttonNext			= Utils.getElementFromID ('buttonNext');
+					this._buttonLast			= Utils.getElementFromID ('buttonLast');
+					this._wordModeMenu			= Utils.getElementFromID ('menuWordMode');
+					this._numberModeMenu		= Utils.getElementFromID ('menuNumberMode');
+					this._caseModeMenu			= Utils.getElementFromID ('menuCaseMode');
+					this._declensionModeMenu	= Utils.getElementFromID ('menuDeclension');
+					this._showAllCasesCheckbox	= Utils.getElementFromID ('checkboxShowAllCases');
+
+					this.setDeclensionChoice(RANDOM);
+					this.setWordChoice(RANDOM);
+					this.setNumberChoice(RANDOM);
+					this.setCaseChoice(RANDOM);
+					this.chooseNextWord();
+					this.updateButtonEnableDisableState();
+				}
+
+				erase()
+				{
+					this._context.fillStyle = "#FFFFFF";
+					this._context.fillRect (0, 0, 1200, 300);
+				}
+
+				draw()
+				{
+					if (!this._showAllCases)
+					{
+						this._context.font		= "Italic small-caps 128px serif";
+						this._context.textAlign	= "center";
+						this._context.fillStyle = "#000000";
+						this._context.fillText (this.getCurrentWord(),	600,	150);
+
+						this._context.font		= "48px serif";
+						this._context.fillText (this.getCurrentDefinition(),	600,	300 - 20);
+
+						this._context.font		= "18px serif";
+						this._context.textAlign	= "left";
+						this._context.fillText (this._nouns[this.getCurrentDeclension()].getDescription(),	10,	30);
+						this._context.fillText (Number.getMeaning(this.getCurrentNumber()),	10,	300 - 20);
+						this._context.textAlign	= "right";
+						this._context.fillText (Gender.getMeaning(this.getCurrentGender()),	1200 - 10,	30);
+						this._context.fillText (Case.getMeaning(this.getCurrentCase()),	1200 - 10,	300 - 20);
+					}
+					else
+					{
+						var	yPixelsPerRow	= 40;
+						var xPixelsPerCol	= 300;
+						var	xOffset			= 100;
+						var	X				= [350,		400,	700 ];
+						var	Xalignment		= ["right", "left", "left"];
+						var	yOffset			= 50;
+						this._context.fillStyle = "#000000";
+
+						var	Y = 0,	caseName = "",	numberName = "",	text = "";
+
+						//	For each case...
+						for (var theCase = 0;  theCase <= Case.Ablative()+1;  theCase++)
+						{
+							if (theCase > 0)
+								caseName = Case.toString(theCase-1, true);
+							Y  =  yOffset  +  theCase * yPixelsPerRow;
+
+							//	For each number...
+							for (var theNumber = 0;  theNumber <= 2;  theNumber++)
+							{
+								if (theNumber > 0)
+									numberName = Number.getMeaning(theNumber-1);
+								if (theCase == 0)
+								{
+									this._context.font = "Bold 36px sans-serif";
+									text = numberName;
+								}
+								else if (theNumber == 0)
+								{
+									this._context.font = "Bold 24px sans-serif";
+									text = caseName;
+								}
+								else
+								{
+									this._context.font = "Italic small-caps 36px serif";
+									text = this._nouns[this._currentDeclension].getWordRendering (this.getCurrentWordIndex(), theNumber-1, theCase-1);
+								}
+								this._context.textAlign	= Xalignment[theNumber];
+								this._context.fillText (text,  X[theNumber],  Y);
+								//console.log ("fillText('" + text + "', " + X[theNumber].toString() + ", " + Y.toString() + ")");
+							}	//	for each Number
+						}	//	for each Case
+
+						this._context.font		= "18px serif";
+						this._context.textAlign	= "center";
+						this._context.fillText (this.getCurrentDefinition(),	600,	300 - 15);
+
+						this._context.font		= "18px serif";
+						this._context.textAlign	= "left";
+						this._context.fillText (this._nouns[this.getCurrentDeclension()].getDescription(),	10,	30);
+
+						this._context.textAlign	= "right";
+						this._context.fillText (Gender.getMeaning(this.getCurrentGender()),	1200 - 10,	30);
+					}	//	else showAllCases
+				}	//	draw()
+
+				getCurrentWord()
+				{
+					return this._nouns[this._currentDeclension].getWordRendering(this._wordIndex, this._currentNumber, this._currentCase);
+				}
+
+				getCurrentDefinition()
+				{
+					return this._nouns[this._currentDeclension].getWordDefinition(this._wordIndex);
+				}
+
+				getCurrentWordIndex()	{return this._wordIndex;}
+				getCurrentNumber()		{return this._currentNumber;}
+				getCurrentCase()		{return this._currentCase;}
+				getCurrentGender()		{return this._nouns[this._currentDeclension].getGender();}
+				getCurrentDeclension()	{return this._currentDeclension;}
+
+				chooseFirstWord()
+				{
+					if (this._chooseDeclension == RANDOM)
+						return;
+					if (this._chooseWord == RANDOM)
+						return;
+
+					this._wordIndex = 0;
+
+					//	Choose number...
+					if (this._chooseNumber == RANDOM)
+						this._currentNumber = Utils.getRandomInt(0, 2);
+					else
+						this._currentNumber = this._chooseNumber;
+					//	Choose case...
+					if (this._chooseCase == RANDOM)
+						this._currentCase = Utils.getRandomInt(0, 5);
+					else
+						this._currentCase = this._chooseCase;
+					this.wordChanged (this.getCurrentWord());
+				}
+
+				choosePreviousWord()
+				{
+					if (this._chooseDeclension == RANDOM)
+						return;
+					if (this._chooseWord == RANDOM)
+						return;
+
+					this._wordIndex = this._wordIndex - 1;
+					if (this._wordIndex < 0)
+						this._wordIndex = 0;
+
+					//	Choose number...
+					if (this._chooseNumber == RANDOM)
+						this._currentNumber = Utils.getRandomInt(0, 2);
+					else
+						this._currentNumber = this._chooseNumber;
+					//	Choose case...
+					if (this._chooseCase == RANDOM)
+						this._currentCase = Utils.getRandomInt(0, 5);
+					else
+						this._currentCase = this._chooseCase;
+					this.wordChanged (this.getCurrentWord());
+				}
+
+				chooseNextWord()
+				{
+					//	Choose declension...
+					if (this._chooseDeclension == RANDOM)
+						this._currentDeclension = Utils.getRandomInt(0, 3);
+
+					//	Choose word...
+					if (this._chooseWord == RANDOM)
+						this._wordIndex = Utils.getRandomInt(0, this._nouns[this._currentDeclension].getWordCount());
+					else
+					{
+						this._wordIndex = this._wordIndex + 1;
+						if (this._wordIndex >= this._nouns[this._currentDeclension].getWordCount())
+							this._wordIndex = this._nouns[this._currentDeclension].getWordCount() - 1;
+					}
+
+					//	Choose number...
+					if (this._chooseNumber == RANDOM)
+						this._currentNumber = Utils.getRandomInt(0, 2);
+					else
+						this._currentNumber = this._chooseNumber;
+
+					//	Choose case...
+					if (this._chooseCase == RANDOM)
+						this._currentCase = Utils.getRandomInt(0, 5);
+					else
+						this._currentCase = this._chooseCase;
+					this.wordChanged (this.getCurrentWord());
+				}
+
+				chooseLastWord()
+				{
+					if (this._chooseDeclension == RANDOM)
+						return;
+					if (this._chooseWord == RANDOM)
+						return;
+
+					if (this._nouns[this._currentDeclension].getWordCount() > 0)
+						this._wordIndex = this._nouns[this._currentDeclension].getWordCount() - 1;
+
+					//	Choose number...
+					if (this._chooseNumber == RANDOM)
+						this._currentNumber = Utils.getRandomInt(0, 2);
+					else
+						this._currentNumber = this._chooseNumber;
+					//	Choose case...
+					if (this._chooseCase == RANDOM)
+						this._currentCase = Utils.getRandomInt(0, 5);
+					else
+						this._currentCase = this._chooseCase;
+					this.wordChanged (this.getCurrentWord());
+				}
+
+				getWordChoice()
+				{
+					return this._chooseWord;
+				}
+
+				setWordChoice (inNewValue)
+				{
+					if (inNewValue != RANDOM)
+					{
+						this._chooseWord = 0;
+					}
+					else
+					{
+						this._chooseWord = RANDOM;
+					}
+					this.wordChoiceChanged (this._chooseWord);
+				}
+
+				updateButtonEnableDisableState()
+				{
+					if (this._chooseWord == RANDOM)
+					{
+						this._buttonFirst.disabled = true;
+						this._buttonPrevious.disabled = true;
+						this._buttonNext.disabled = false;
+						this._buttonLast.disabled = true;
+					}
+					else
+					{
+						this._buttonFirst.disabled = this._wordIndex == 0;
+						this._buttonPrevious.disabled = this._wordIndex == 0;
+						this._buttonNext.disabled = this._wordIndex >= (this._nouns[this._currentDeclension].getWordCount()-1);
+						this._buttonLast.disabled = this._wordIndex >= (this._nouns[this._currentDeclension].getWordCount()-1);
+					}
+				}
+
+				wordChanged (inNewWord)
+				{
+					//console.log ("wordChanged:  to '" + inNewWord + "'");
+					this.erase();
+					this.draw();
+					this.updateButtonEnableDisableState();
+				}
+
+				wordChoiceChanged (inNewChoiceMode)
+				{
+					if (inNewChoiceMode == RANDOM)
+						this._wordModeMenu.value = 1;
+					else
+						this._wordModeMenu.value = inNewChoiceMode;
+					this.updateButtonEnableDisableState();
+				}
+
+				wordModeSelected()
+				{
+					if (this._wordModeMenu)
+					{
+						if (this._wordModeMenu.value < 1)
+							this.setWordChoice (this._wordModeMenu.value);
+						else
+							this.setWordChoice (null);
+					}
+				}
+
+				nextWordMode()
+				{
+					var choice = this.getWordChoice();
+					if (choice == RANDOM)
+						choice = 1;
+					else
+						choice = RANDOM;
+					this.setWordChoice (choice);
+				}
+
+				getNumberChoice()
+				{
+					return this._chooseNumber;
+				}
+
+				setNumberChoice (inNewNumber)
+				{
+					if (inNewNumber != RANDOM)
+					{
+						if (inNewNumber >= 0  &&  inNewNumber < 2)
+						{
+							this._chooseNumber = inNewNumber;
+							this._currentNumber = inNewNumber;
+							this.erase();
+							this.draw();
+						}
+					}
+					else
+						this._chooseNumber = RANDOM;
+					this.numberChoiceChanged (this._chooseNumber);
+				}
+
+				numberChoiceChanged (inNewChoiceMode)
+				{
+					if (inNewChoiceMode == RANDOM)
+						this._numberModeMenu.value = 2;
+					else
+						this._numberModeMenu.value = inNewChoiceMode;
+				}
+
+				numberModeSelected()
+				{
+					if (this._numberModeMenu)
+					{
+						if (this._numberModeMenu.value < 2)
+							this.setNumberChoice (this._numberModeMenu.value);
+						else
+							this.setNumberChoice (null);
+					}
+				}
+
+				getCaseChoice()
+				{
+					return this._chooseCase;
+				}
+
+				setCaseChoice (inNewCase)
+				{
+					if (inNewCase != RANDOM)
+					{
+						if (inNewCase >= 0  &&  inNewCase < 6)
+						{
+							this._chooseCase = inNewCase;
+							this._currentCase = inNewCase;
+							this.erase();
+							this.draw();
+						}
+					}
+					else
+						this._chooseCase = RANDOM;
+					this.caseChoiceChanged (this._chooseCase);
+				}
+
+				caseChoiceChanged (inNewChoiceMode)
+				{
+					if (inNewChoiceMode == RANDOM)
+						this._caseModeMenu.value = 5;
+					else
+						this._caseModeMenu.value = inNewChoiceMode;
+				}
+
+				caseModeSelected()
+				{
+					if (this._caseModeMenu)
+					{
+						if (this._caseModeMenu.value < 5)
+							this.setCaseChoice (this._caseModeMenu.value);
+						else
+							this.setCaseChoice (RANDOM);
+					}
+				}
+
+				getDeclensionChoice()
+				{
+					return this._chooseDeclension;
+				}
+
+				setDeclensionChoice (inNewDecl)
+				{
+					if (inNewDecl != RANDOM)
+					{
+						if (inNewDecl >= 0  &&  inNewDecl < 3)
+						{
+							this._chooseDeclension = inNewDecl;
+							this._currentDeclension = inNewDecl;
+							this.chooseNextWord();
+							this.erase();
+							this.draw();
+						}
+					}
+					else
+						this._chooseDeclension = RANDOM;
+					this.declensionChoiceChanged (this._chooseDeclension);
+				}
+
+				declensionChoiceChanged (inNewChoiceMode)
+				{
+					if (inNewChoiceMode == RANDOM)
+						this._declensionModeMenu.value = 3;
+					else
+						this._declensionModeMenu.value = inNewChoiceMode;
+				}
+
+				declensionSelected()
+				{
+					if (this._declensionMenu)
+					{
+						if (this._declensionMenu.value < 3)
+							this.setDeclensionChoice (this._declensionMenu.value);
+						else
+							this.setDeclensionChoice (RANDOM);
+					}
+				}
+
+				toggleShowAllCases()
+				{
+					if (this._showAllCasesCheckbox)
+					{
+						if (this._showAllCasesCheckbox.checked)
+							this._showAllCases = true;
+						else
+							this._showAllCases = false;
+						this.erase();
+						this.draw();
+					}
+				}
+
+			}	//	FlashCardView
+
+
+			cardView = new FlashCardView;
+
+		</script>
+	</body>
+</html>
